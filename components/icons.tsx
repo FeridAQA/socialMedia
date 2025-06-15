@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import { IconSvgProps } from "@/types";
+import { FaLinkedinIn } from "react-icons/fa";
 
 export const Logo: React.FC<IconSvgProps> = ({
   size = 36,
@@ -9,20 +10,21 @@ export const Logo: React.FC<IconSvgProps> = ({
   ...props
 }) => (
   <svg
-    fill="none"
-    height={size || height}
-    viewBox="0 0 32 32"
+    viewBox="0 0 64 64"
     width={size || width}
+    height={size || height}
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
     {...props}
   >
+    <circle cx="32" cy="32" r="30" stroke="currentColor" strokeWidth="4" />
     <path
-      clipRule="evenodd"
-      d="M17.6482 10.1305L15.8785 7.02583L7.02979 22.5499H10.5278L17.6482 10.1305ZM19.8798 14.0457L18.11 17.1983L19.394 19.4511H16.8453L15.1056 22.5499H24.7272L19.8798 14.0457Z"
+      d="M20 26C20 22.6863 22.6863 20 26 20H38C41.3137 20 44 22.6863 44 26V32C44 35.3137 41.3137 38 38 38H32L26 44V38H26C22.6863 38 20 35.3137 20 32V26Z"
       fill="currentColor"
-      fillRule="evenodd"
     />
   </svg>
 );
+
 
 export const DiscordIcon: React.FC<IconSvgProps> = ({
   size = 24,
@@ -65,6 +67,11 @@ export const TwitterIcon: React.FC<IconSvgProps> = ({
     </svg>
   );
 };
+
+export const LinkedInIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <FaLinkedinIn {...props} />
+);
+
 
 export const GithubIcon: React.FC<IconSvgProps> = ({
   size = 24,
