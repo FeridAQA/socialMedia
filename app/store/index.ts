@@ -1,15 +1,13 @@
-// app/store/index.ts (or app/store/store.ts)
+// app/store/index.ts
 import { configureStore } from '@reduxjs/toolkit';
-import authReducer from './authSlice'; // authSlice'ı import edin
+import authReducer from './authSlice';
 
 export const store = configureStore({
   reducer: {
-    auth: authReducer, // authSlice'ı reducer'lara əlavə edin
-    // buraya digər reducer'larınızı da əlavə edə bilərsiniz
+    auth: authReducer,
+    // Add other reducers here if you have them
   },
 });
 
-// RootState tipini bütün Redux state-inin tipini təyin etmək üçün istifadə edin
 export type RootState = ReturnType<typeof store.getState>;
-// AppDispatch tipini dispatch funksiyasının tipini təyin etmək üçün istifadə edin
 export type AppDispatch = typeof store.dispatch;

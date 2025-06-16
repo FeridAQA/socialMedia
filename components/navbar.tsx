@@ -88,6 +88,18 @@ export const Navbar = () => {
               Ana Səhifə
             </NextLink>
           </NavbarItem>
+          <NavbarItem>
+            <NextLink
+              className={clsx(
+                linkStyles({ color: "foreground" }),
+                "data-[active=true]:text-primary data-[active=true]:font-medium",
+              )}
+              color="foreground"
+              href="/profile" // Profil səhifəsinə keçid
+            >
+              Profil
+            </NextLink>
+          </NavbarItem>
         </ul>
       </NavbarContent>
 
