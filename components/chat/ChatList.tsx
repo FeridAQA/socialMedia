@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Input, Avatar, Spinner } from '@nextui-org/react';
-import { MagnifyingGlassIcon  } from '@heroicons/react/24/outline'; // Outline ikon
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'; // Outline ikon
 
 import { Chat } from '@/hooks/useChatList';
 
@@ -38,11 +38,12 @@ export const ChatList: React.FC<ChatListProps> = ({ chats, loading, error, onSel
       <div className="p-4 border-b border-default-200 dark:border-gray-700">
         <Input
           placeholder="Axtarışa başla və ya yeni çat yarat"
-          startContent={<MagnifyingGlassIcon  className="h-5 w-5 text-default-400" />}
+          startContent={<MagnifyingGlassIcon className="h-5 w-5 text-default-400" />}
           className="w-full"
           variant="faded"
         />
       </div>
+      {/* Burada overflow-y-auto artıq var, bu da chat siyahısının scroll olmasını təmin edir */}
       <div className="flex-1 overflow-y-auto">
         {chats.length === 0 ? (
           <div className="text-center text-default-500 p-4">
@@ -51,18 +52,8 @@ export const ChatList: React.FC<ChatListProps> = ({ chats, loading, error, onSel
         ) : (
           chats.map((chat) => {
             const isSelected = chat.id === selectedChatId;
-            // Fərdi çat üçün digər istifadəçinin profil şəkli və adını tapın
-            // Hazırda sizin API cavabınızda fərdi chat üçün "name" null gəlir.
-            // Bu halda chatın iştirakçılarını backend-dən almalısınız.
-            // Əgər API cavabında fərdi çat üçün `participants` array gəlirsə:
-            // const otherParticipant = chat.participants?.find(p => p.id !== currentUserId);
-            // const chatDisplayName = chat.isGroup ? chat.name : (otherParticipant?.userName || 'Naməlum İstifadəçi');
-            // const chatDisplayAvatar = chat.isGroup ? null : (otherParticipant?.profilePicture || null);
-
-            // Məsələn sizin API cavabınıza görə lastMessage-dən senderi istifadə edək:
             const chatDisplayName = chat.name || (chat.lastMessage?.sender?.userName || 'Naməlum İstifadəçi');
             const chatDisplayAvatar = chat.lastMessage?.sender?.profilePicture || null;
-
 
             return (
               <div

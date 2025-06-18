@@ -6,15 +6,15 @@ import { Spinner, Avatar, Input, Button } from '@nextui-org/react';
 import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
 
 import { ChatMessage } from '@/hooks/useChatMessages';
-import { Chat } from '@/hooks/useChatList'; // Chat tipini de import edin
+import { Chat } from '@/hooks/useChatList';
 
 interface ChatWindowProps {
-  chat: Chat | null; // Seçilmiş chat obyekti
+  chat: Chat | null;
   messages: ChatMessage[];
   loading: boolean;
   error: string | null;
   onSendMessage: (message: string) => void;
-  currentUserId: number; // Cari user ID'si
+  currentUserId: number;
   hasMoreMessages: boolean;
   onLoadMoreMessages: () => void;
 }
@@ -30,17 +30,15 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   onLoadMoreMessages,
 }) => {
   const [messageInput, setMessageInput] = React.useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null); // Mesajların sonuna scroll etmek için
-  const chatWindowRef = useRef<HTMLDivElement>(null); // Scroll event listener için
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatWindowRef = useRef<HTMLDivElement>(null);
 
-  // Mesajlar yüklendiğinde otomatik olarak en aşağıya scroll et
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages]); // messages her değiştiğinde scroll et
+  }, [messages.length, chat]);
 
-  // Daha fazla mesaj yüklemek için scroll event listener
   useEffect(() => {
     const handleScroll = () => {
       if (chatWindowRef.current && chatWindowRef.current.scrollTop === 0 && hasMoreMessages && !loading) {
@@ -60,7 +58,6 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     };
   }, [hasMoreMessages, loading, onLoadMoreMessages]);
 
-
   const handleSend = () => {
     if (messageInput.trim()) {
       onSendMessage(messageInput.trim());
@@ -68,16 +65,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
   };
 
-   if (!chat) { // Əgər heç bir chat seçilməyibsə
+  if (!chat) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-content1 dark:bg-gray-800 rounded-lg shadow-md">
-        {/* <Image
-          src="/path/to/whatsapp-like-logo.svg" // Kendi logonuzu buraya yerleştirin
-          alt="Welcome"
-          width={150}
-          height={150}
-          className="mb-6 opacity-70"
-        /> */}
         <h2 className="text-3xl font-semibold text-foreground dark:text-white mb-4">
           Sohbətlərə Xoş Gəlmisiniz!
         </h2>
@@ -97,10 +87,10 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         <Avatar
           src={
             chat.isGroup
-              ? undefined // Qrup üçün avatar yoxdursa
+              ? undefined
               : (chat.lastMessage?.sender?.profilePicture || `https://ui-avatars.com/api/?name=${chat.name || 'Group'}&background=random`)
           }
-          name={chat.name || (chat.lastMessage?.sender?.userName || 'Naməlum')}
+          name={chat.name || (chat.isGroup ? "Qrup Çatı" : chat.lastMessage?.sender?.userName || "Naməlum")}
           size="md"
           className="mr-3"
         />
@@ -109,7 +99,20 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
         </h2>
       </div>
 
-      <div ref={chatWindowRef} className="flex-1 p-4 overflow-y-auto flex flex-col-reverse"> {/* flex-col-reverse ile mesajları aşağıdan yukarıya diz */}
+      {/* flex-col-reverse və overflow-y-auto burada mesajları scroll etmək üçün istifadə olunur */}
+      <div ref={chatWindowRef} className="flex-1 p-4 overflow-y-auto flex flex-col-reverse">
+        
+        {hasMoreMessages && !loading && (
+          <Button
+            size="sm"
+            variant="flat"
+            color="primary"
+            className="self-center mt-2 mb-4"
+            onClick={onLoadMoreMessages}
+          >
+            Daha çox mesaj yüklə
+          </Button>
+        )}
         {loading && messages.length === 0 && (
           <div className="flex justify-center my-4">
             <Spinner />
@@ -120,19 +123,8 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             <p>Mesajlar yüklənərkən xəta: {error}</p>
           </div>
         )}
-        {hasMoreMessages && !loading && (
-          <Button
-            size="sm"
-            variant="flat"
-            color="primary"
-            className="self-center mt-2"
-            onClick={onLoadMoreMessages}
-          >
-            Daha çox mesaj yüklə
-          </Button>
-        )}
 
-        {messages.slice().reverse().map((msg) => ( // Mesajları ters çevirerek en son mesajı en altta göster
+        {messages.slice().reverse().map((msg) => (
           <div
             key={msg.id}
             className={`flex mb-3 ${msg.sender.id === currentUserId ? 'justify-end' : 'justify-start'}`}
@@ -140,14 +132,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             <div
               className={`max-w-[70%] p-3 rounded-lg shadow-md ${
                 msg.sender.id === currentUserId
-                  ? 'bg-primary-500 text-white dark:bg-blue-700'
+                  ? 'bg-primary-500 text-white dark:bg-green-700'
                   : 'bg-default-200 text-foreground dark:bg-default-700 dark:text-white'
               }`}
             >
               {msg.sender.id !== currentUserId && (
-                <div className="font-semibold text-sm mb-1">
-                  {msg.sender.userName}
-                </div>
+                 <div className="font-semibold text-sm mb-1 text-blue-200">
+                   {msg.sender.userName}
+                 </div>
               )}
               <p className="text-sm break-words">{msg.message}</p>
               <span className="block text-right text-xs mt-1 opacity-80">
@@ -156,7 +148,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} /> {/* Yeni mesajların sonuna scroll etmek için */}
+        <div ref={messagesEndRef} />
       </div>
 
       <div className="p-4 border-t border-default-200 dark:border-gray-700 flex items-center gap-2">
