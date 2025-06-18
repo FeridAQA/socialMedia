@@ -3,17 +3,18 @@
 
 import React from 'react';
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Image, Avatar } from '@nextui-org/react';
-import { UserPost, UserProfile } from '@/hooks/useUserProfile'; // Buradan import edin
+// UserPost tipini useUserPosts-dan, UserProfile tipini useUserProfile-dan import edin
+import { UserPost } from '@/hooks/useUserPosts';
+import { UserProfile } from '@/hooks/useUserProfile';
 import { HeartIcon, ChatBubbleOvalLeftEllipsisIcon } from '@heroicons/react/24/solid';
 
 interface PostModalProps {
   isOpen: boolean;
   onClose: () => void;
   post: UserPost | null;
-  user: UserProfile; // Postun sahibinin məlumatları (bu halda cari user)
+  user: UserProfile;
 }
 
-// React.C yerinə React.FC istifadə edin və prop tipini göstərin
 export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, post, user }) => {
   if (!post) return null;
 
@@ -24,18 +25,15 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, post, use
       onClose={onClose}
       scrollBehavior="inside"
       placement="center"
+      className="max-w-4xl"
     >
       <ModalContent>
-        {/* onClick handler üçün onClose funksiyasını birbaşa istifadə edə bilərsiniz */}
-        {/* {(onClose) => ( ... ) } - Bu NextUI Modal-ın render prop funksiyasıdır, lakin sizin use case-inizdə birbaşa onClose-u prop-lardan istifadə etmək daha yaxşıdır.
-            Əgər ModalContent daxilində "close" düyməsi yaratmaq istəyirsinizsə, o zaman render prop olaraq `onClose` ala bilərsiniz.
-            Mən propdan gələn `onClose` istifadə etməyi məsləhət görürəm. */}
           <div className="flex flex-col md:flex-row h-[80vh]">
-            <div className="flex-1 flex items-center justify-center p-2 bg-black-alpha-900 rounded-l-lg md:rounded-l-none">
+            <div className="flex-1 flex flex-col items-center justify-center p-2 bg-black-alpha-900 rounded-l-lg md:rounded-l-none overflow-hidden">
               <Image
-                src={post.imageUrl}
-                alt={post.caption}
-                className="max-h-full max-w-full object-contain rounded-md"
+                src={post.images.length > 0 ? post.images[0].url : '/path/to/default-image.jpg'}
+                alt={post.description || "Post image"}
+                className="max-h-full max-w-full object-contain rounded-md h-auto w-auto"
               />
             </div>
 
@@ -48,15 +46,15 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, post, use
               </ModalHeader>
               <ModalBody className="flex-grow overflow-y-auto">
                 <p className="text-sm">
-                  <span className="font-bold">{user.userName}</span> {post.caption}
+                  {post.description}
                 </p>
 
                 <div className="flex items-center gap-4 mt-4">
                   <span className="flex items-center gap-1">
-                    <HeartIcon className="w-5 h-5 text-red-500" /> {post.likesCount}
+                    <HeartIcon className="w-5 h-5 text-red-500" /> {post.likes.length}
                   </span>
                   <span className="flex items-center gap-1">
-                    <ChatBubbleOvalLeftEllipsisIcon className="w-5 h-5 text-blue-500" /> {post.commentsCount}
+                    <ChatBubbleOvalLeftEllipsisIcon className="w-5 h-5 text-blue-500" /> {0}
                   </span>
                 </div>
 
@@ -65,7 +63,7 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, post, use
                 </div>
               </ModalBody>
               <ModalFooter className="border-t pt-2">
-                <Button color="danger" variant="light" onPress={onClose}> {/* Buradakı onPress də `onClose` istifadə edir */}
+                <Button color="danger" variant="light" onPress={onClose}>
                   Bağla
                 </Button>
               </ModalFooter>

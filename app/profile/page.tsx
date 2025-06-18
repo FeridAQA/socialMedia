@@ -1,20 +1,23 @@
 // app/profile/page.tsx
-'use client'; // Bu direktiv mütləq olmalıdır
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { ProfileHeader } from '@/components/profile/ProfileHeader';
 import { PostGrid } from '@/components/profile/PostGrid';
 import { PostModal } from '@/components/profile/PostModal';
-import { UserPost, UserProfile, useUserProfile } from '@/hooks/useUserProfile';
+
+// useUserProfile və UserProfile tipini ayrı fayldan import edin
+import { useUserProfile, UserProfile } from '@/hooks/useUserProfile';
+// useUserPosts və UserPost tipini ayrı fayldan import edin
+import { useUserPosts, UserPost } from '@/hooks/useUserPosts';
+
 import { Spinner, Button } from '@nextui-org/react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../store';
 import { useRouter } from 'next/navigation';
 import { clearToken } from '../store/authSlice';
-import { useUserPosts } from '@/hooks/useUserPosts';
 
 
-// DEFAULT EXPORT OLDUĞUNDAN ƏMİN OLUN
 export default function ProfilePage() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -36,7 +39,6 @@ export default function ProfilePage() {
   });
 
   useEffect(() => {
-    // Authenticate olunmayıbsa və token yoxdursa (və yüklənmə bitibsə) login səhifəsinə yönləndir
     if (!isAuthenticated && !userToken && !userLoading && !postsLoading) {
       router.push('/login');
     }
@@ -65,7 +67,6 @@ export default function ProfilePage() {
     console.log("Edit Profile action.");
   };
 
-  // Profil məlumatları yüklənirsə
   if (userLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -75,7 +76,6 @@ export default function ProfilePage() {
     );
   }
 
-  // Profil məlumatları yüklənməyibsə və xəta varsa
   if (userError || !user) {
     return (
       <div className="flex flex-col justify-center items-center h-screen text-danger-500 p-4">
@@ -85,11 +85,15 @@ export default function ProfilePage() {
     );
   }
 
-  // Profil məlumatları uğurla yüklənib
+  const userWithPostsCount = {
+      ...user,
+      postsCount: posts.length, // Çəkilən postların sayını əlavə edirik
+  };
+
   return (
     <div className="container mx-auto p-4 max-w-5xl">
       <ProfileHeader
-        user={user}
+        user={userWithPostsCount}
         isCurrentUser={true}
         onFollowToggle={handleFollowToggle}
         onEditProfile={handleEditProfile}
