@@ -1,14 +1,14 @@
-// app/store/index.ts və ya app/store/store.ts
+// app/store/index.ts
 import { configureStore } from '@reduxjs/toolkit';
-import authReducer from './authSlice';
+import authReducer from './authSlice'; // Bu faylın mövcud olduğunu fərz edirəm
 import chatReducer from './chatSlice';
-import messageReducer from './messageSlice'; // ← Əlavə et
+import messagesReducer from './messageSlice'; // Doğru olaraq 'messageSlice' adını istifadə edirik
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
-    chats: chatReducer, // ← ad istəyə uyğun dəyişilə bilər
-    messages: messageReducer, // ← Ən vacib hissə budur!
+    chats: chatReducer,
+    messages: messagesReducer,
   },
 });
 

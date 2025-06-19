@@ -21,5 +21,5 @@ const chatSlice = createSlice({
   },
 });
 
-export const { setChats, addChat, updateChat } = chatSlice.actions; // ← Bura önəmlidir
+export const { setChats, addChat, updateChat } = chatSlice.actions;
 export default chatSlice.reducer;
