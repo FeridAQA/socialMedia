@@ -1,6 +1,8 @@
 // app/store/messageSlice.ts
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { ChatMessage } from '@/hooks/useChatMessages'; // ChatMessage tipini import edin
+import { createSelector } from '@reduxjs/toolkit'; // createSelector'ı import edin
+import { ChatMessage } from '@/hooks/useChatMessages';
+import { RootState } from '@/app/store'; // RootState'i import edin
 
 interface MessageState {
   [chatId: number]: ChatMessage[];
@@ -38,9 +40,25 @@ const messageSlice = createSlice({
         } else {
             state[chatId] = messages;
         }
-    }
+    },
+    // Müəyyən bir chatın mesajlarını təmizləmək üçün reducer
+    clearMessages: (state, action: PayloadAction<number>) => {
+      delete state[action.payload];
+    },
   },
 });
 
 export const { setMessages, addMessage, prependMessages } = messageSlice.actions;
 export default messageSlice.reducer;
+
+// Memoizasiyalı selector yaratmaq və onu ixrac etmək
+export const selectMessagesByChatId = createSelector(
+  (state: RootState) => state.messages, // Bütün mesajlar state'i
+  (state: RootState, chatId: number | null) => chatId, // chat.id parametri
+  (messagesState, chatId) => {
+    if (chatId === null) {
+      return [];
+    }
+    return messagesState[chatId] || [];
+  }
+);

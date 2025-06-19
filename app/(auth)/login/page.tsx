@@ -5,7 +5,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserIcon, LockClosedIcon } from '@heroicons/react/24/solid';
 import { useDispatch } from 'react-redux';
-import { setToken } from '../../store/authSlice';
+import { setCredentials } from '../../store/authSlice'; // setCredentials'ı import edin
+import type { User } from '../../store/authSlice'; // User tipini de import edin
 import config from '../../../config';
 
 export default function LoginPage() {
@@ -40,8 +41,16 @@ export default function LoginPage() {
 
       if (response.ok) {
         console.log('Daxilolma uğurlu oldu:', data);
-        dispatch(setToken(data.token));
-        router.push('/');
+        // Backend'den gelen 'data' objesinin içinde 'token' ve 'user' olduğunu varsayıyoruz
+        // user objesi { id: number, userName: string } formatında olmalıdır
+        const { token, user } = data; // Bu satır backend'in cevabına göre değişebilir
+
+        if (token && user) {
+          dispatch(setCredentials({ token, user: user as User })); // User tipini belirtin
+          router.push('/');
+        } else {
+          setError('Daxilolma uğursuz oldu: Token və ya istifadəçi məlumatı tapılmadı.');
+        }
       } else {
         setError(data.message || 'Daxilolma uğursuz oldu. Naməlum xəta.');
       }
@@ -70,7 +79,7 @@ export default function LoginPage() {
               <label htmlFor="username-or-email" className="sr-only">İstifadəçi adı və ya E-poçt</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <UserIcon className="h-5 w-5 text-gray-400 dark:text-gray-400" aria-hidden="true" /> {/* İkon rəngi dəyişmir */}
+                  <UserIcon className="h-5 w-5 text-gray-400 dark:text-gray-400" aria-hidden="true" />
                 </div>
                 <input
                   id="username-or-email"
@@ -89,7 +98,7 @@ export default function LoginPage() {
               <label htmlFor="password" className="sr-only">Şifrə</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <LockClosedIcon className="h-5 w-5 text-gray-400 dark:text-gray-400" aria-hidden="true" /> {/* İkon rəngi dəyişmir */}
+                  <LockClosedIcon className="h-5 w-5 text-gray-400 dark:text-gray-400" aria-hidden="true" />
                 </div>
                 <input
                   id="password"

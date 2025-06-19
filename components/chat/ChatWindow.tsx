@@ -1,20 +1,21 @@
 // components/chat/ChatWindow.tsx
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Chat } from '@/hooks/useChatList';
-import { ChatMessage } from '@/hooks/useChatMessages';
-import { useSelector, useDispatch } from 'react-redux'; // useDispatch import edin
-import { RootState } from '@/app/store';
+import { ChatMessage } from '@/hooks/useChatMessages'; // ChatMessage tipini import edin
+import { useSelector } from 'react-redux';
+import { RootState } from '@/app/store'; // RootState import edin
 import { useSocket } from '@/hooks/useSocket';
-// addMessage ve updateChat buraya import edilmeyecek, zira useSocket içinde dispatch ediliyor.
+import { useTheme } from 'next-themes'; // next-themes hook'unu import edin
+import { selectMessagesByChatId } from '@/app/store/messageSlice'; // Memoizasiyalı selectoru import edin
 
 interface ChatWindowProps {
   chat: Chat | null;
   loading: boolean;
   error: string | null;
   onSendMessage: (messageContent: string) => void;
-  currentUserId: number;
+  // currentUserId propunu buradan çıxarırıq, çünki Redux-dan alınacaq
   hasMoreMessages: boolean;
   onLoadMoreMessages: () => void;
 }
@@ -24,30 +25,50 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   loading,
   error,
   onSendMessage,
-  currentUserId,
   hasMoreMessages,
   onLoadMoreMessages,
 }) => {
   const [messageInput, setMessageInput] = useState('');
   const [someoneIsTyping, setSomeoneIsTyping] = useState<null | { userId: number; username: string }>(null);
-  const socketRef = useSocket(); // useSocket hook'undan socketRef objesini al
+  const socketRef = useSocket();
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  const dispatch = useDispatch(); // useDispatch'i kullanın
+  const { theme } = useTheme(); // Cari temayı alın (light/dark)
 
-  // Redux store'dan mesajları seçiyoruz. Bu, useSocket içindeki addMessage çağrıldığında otomatik güncellenecek.
-  const messages = useSelector((state: RootState) => chat?.id ? (state.messages[chat.id] || []) : []);
+  // Redux store'dan mesajları memoizasiyalı selector ilə seçin
+  const messages = useSelector((state: RootState) => selectMessagesByChatId(state, chat?.id || null));
+  // currentUserId-ni auth slice-dan alın
+  const currentUserId = useSelector((state: RootState) => state.auth.user?.id || null);
 
-  // Bu state, scroll'un en aşağıda olub-olmadığını yoxlayacaq
-  const [isScrolledToBottom, setIsScrolledToBottom] = useState(true);
+  const prevMessagesLength = useRef(messages.length); // Əvvəlki mesaj sayını saxlamaq üçün
+  const initialLoadRef = useRef(true); // Chat-ın ilk yüklənməsini izləmək üçün
 
-  // **BURADA DƏYİŞİKLİK: Socket event listenerləri yalnız `chat.writing` üçün qalır, `message.create` useSocket-a daşındı**
+  // Mesajlar dəyişdikdə və ya yeni chat seçildikdə scroll-u idarə et
+  useEffect(() => {
+    const chatContainer = chatContainerRef.current;
+    if (!chatContainer) return;
+
+    if (initialLoadRef.current && messages.length > 0) {
+      // İlk yükləmədə (və ya yeni chat seçiləndə) ən aşağıya scroll et
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+      initialLoadRef.current = false; // İlk yükləmə tamamlandı
+    } else if (messages.length > prevMessagesLength.current) {
+      // Yeni mesaj gəldikdə (sayı artdıqda)
+      // Əgər istifadəçi mesaj pəncərəsinin dibinə kifayət qədər yaxındırsa (məsələn, 200px içində), avtomatik scroll et
+      const isUserAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight < 200;
+      if (isUserAtBottom) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
+    }
+    prevMessagesLength.current = messages.length; // Mesaj sayını yenilə
+  }, [messages, chat]); // `chat` əlavə edildi ki, chat dəyişdikdə bu effekt yenidən işləsin
+
+  // `chat.writing` event listener
   useEffect(() => {
     const socket = socketRef.current;
-    if (!socket || !chat) return;
+    if (!socket || !chat || currentUserId === null) return;
 
-    // Backend'den 'chat.writing' event'ini dinleyin
     const handleWriting = (payload: { userId: number; username: string; status: boolean; chatId: number }) => {
-      // Yalnız seçili çat və öz yazma statusumuzu filter et
+      // Yalnız cari chat üçün və başqasının yazma statusunu göstər
       if (chat && payload.chatId === chat.id && payload.userId !== currentUserId) {
         if (payload.status) {
           setSomeoneIsTyping({ userId: payload.userId, username: payload.username });
@@ -62,103 +83,147 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     return () => {
       socket.off('chat.writing', handleWriting);
     };
-  }, [socketRef.current, chat, currentUserId]); // socketRef.current'i dependency olaraq əlavə edin
+  }, [socketRef.current, chat, currentUserId]); // `socketRef.current` dependency olaraq əlavə edildi
 
-  // Mesajlar değiştiğinde veya yeni mesaj geldiğinde scroll'u yönet
-  useEffect(() => {
-    if (chatContainerRef.current && isScrolledToBottom) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+  // Infinity scroll handler
+  const handleScroll = useCallback(() => {
+    if (!chatContainerRef.current) return;
+
+    const { scrollTop } = chatContainerRef.current;
+
+    // Əgər scroll yuxarıya yaxındırsa (məsələn, ilk 50px içində) və daha çox mesaj varsa və yüklənmə getmirsə
+    if (scrollTop < 50 && hasMoreMessages && !loading) {
+      onLoadMoreMessages(); // Daha köhnə mesajları yükləmək üçün çağır
     }
-  }, [messages, isScrolledToBottom]);
+  }, [hasMoreMessages, loading, onLoadMoreMessages]); // Dependentlər əlavə edildi
 
-  // Scroll olayını dinleyerek kullanıcının manuel scroll edip etmediğini kontrol et
-  const handleScroll = () => {
-    if (chatContainerRef.current) {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-      // Kullanıcı en alt kısma 100px mesafeden daha yakınsa, isScrolledToBottom true olsun
-      setIsScrolledToBottom(scrollHeight - scrollTop - clientHeight < 100);
-    }
-  };
-
+  // Chat dəyişdikdə və ya komponent mount olduqda scroll listener əlavə et
   useEffect(() => {
+    initialLoadRef.current = true; // Hər yeni chatda "ilk yükləmə" statusunu reset et
     const chatContainer = chatContainerRef.current;
     if (chatContainer) {
       chatContainer.addEventListener('scroll', handleScroll);
-      // **BURADA DƏYİŞİKLİK: Yeni chat seçildikdə hər zaman ən aşağıya scroll et**
-      chatContainer.scrollTop = chatContainer.scrollHeight; // Başlangıçta en aşağıda olsun
+      // Yeni chat seçiləndə avtomatik ən alta scroll et (bu, yuxarıdakı useEffect ilə birlikdə işləyəcək)
+      chatContainer.scrollTop = chatContainer.scrollHeight;
       return () => {
         chatContainer.removeEventListener('scroll', handleScroll);
       };
     }
-  }, [chatContainerRef, chat]); // `chat` propunu əlavə edin, chat dəyişdikdə bu useEffect yenidən işləsin
+  }, [chat, handleScroll]); // `chat` propu və `handleScroll` callback'i əlavə edildi
 
+  // Yazma bildirişi (typing indicator) göndərmək üçün
   const handleTyping = () => {
     const socket = socketRef.current;
-    if (!socket || !chat) return;
-    // Sadece kendi ID'mizi ve seçili chat ID'mizi gönder
+    if (!socket || !chat || currentUserId === null) return;
     socket.emit('writing', { chatId: chat.id, status: true, userId: currentUserId });
 
-    // Bir süre sonra yazmayı durdurma sinyali gönder
+    // 3 saniyə sonra yazma statusunu dayandır
     setTimeout(() => {
-      if (socket.connected) { // Socket hala bağlıysa gönder
+      if (socket.connected) { // Socket hələ də bağlıdırsa, statusu sıfırla
         socket.emit('writing', { chatId: chat.id, status: false, userId: currentUserId });
       }
     }, 3000);
   };
 
+  // Mesaj göndərmə formunun submit handler-i
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageInput.trim()) return;
-    onSendMessage(messageInput);
-    setMessageInput('');
-    setIsScrolledToBottom(true); // Mesaj gönderdikten sonra en aşağı scroll et
+    if (!messageInput.trim()) return; // Boş mesaj göndərmə
+    onSendMessage(messageInput); // Parent komponentə mesajı göndərmək üçün callback
+    setMessageInput(''); // İnputu təmizlə
+    // Mesaj göndərildikdən sonra ən aşağıya scroll et
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   };
 
-  if (!chat) return <div className="p-4">Zəhmət olmasa bir çat seçin.</div>;
+  if (!chat) return <div className="p-4 text-gray-500 dark:text-gray-400">Zəhmət olmasa bir çat seçin.</div>;
+  // currentUserId yoxdursa, istifadəçinin daxil olmadığını göstər
+  if (currentUserId === null) return <div className="p-4 text-red-500 dark:text-red-400">İstifadəçi ID-si yüklənmədi. Zəhmət olmasa yenidən daxil olun.</div>;
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
+      {/* Chat Başlığı */}
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700 rounded-t-lg">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{chat.name}</h2>
+      </div>
+
+      {/* Mesajların göstərildiyi ərazi */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 py-2 space-y-2"
+        className="flex-1 overflow-y-auto px-4 py-2 space-y-2 custom-scrollbar" // Custom scrollbar sinfi
       >
-        {hasMoreMessages && (
-          <div className="text-center">
-            <button
-              className="text-sm text-blue-500 hover:underline mb-2"
-              onClick={onLoadMoreMessages}
-            >
-              Daha çox mesaj yüklə
-            </button>
-          </div>
+        {/* Yükləmə indikatoru və xəta mesajları */}
+        {loading && hasMoreMessages && (
+          <div className="text-center text-gray-500 dark:text-gray-400 text-sm py-2">Mesajlar yüklənir...</div>
         )}
-        {/* Mesajları map edərkən sort etməyə ehtiyac yoxdur, çünki store-da artıq düzgün sıra var */}
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.sender.id === currentUserId ? 'justify-end' : 'justify-start'}`}>
-            <div className={`px-4 py-2 rounded-xl max-w-xs ${msg.sender.id === currentUserId ? 'bg-blue-500 text-white' : 'bg-gray-200 text-black'}`}>
-              <div className="text-sm">{msg.sender.userName}</div>
-              <div>{msg.message}</div>
-              <div className="text-xs text-gray-500">{new Date(msg.createdAt).toLocaleTimeString()}</div>
+        {error && (
+            <div className="text-center text-red-500 text-sm py-2">Xəta: {error}</div>
+        )}
+        {!hasMoreMessages && messages.length > 0 && !loading && (
+            <div className="text-center text-gray-400 dark:text-gray-500 text-xs py-2">Bütün mesajlar yükləndi.</div>
+        )}
+
+        {/* Mesajların render edilməsi */}
+        {messages.map((msg: ChatMessage) => { // msg parametrinə ChatMessage tipini veririk
+          let formattedTime = 'Invalid Date';
+          try {
+            // "Invalid Date" xətasını həll etmək üçün try-catch bloku və format yoxlaması
+            // Əmin olun ki, msg.createdAt backenddən ISO 8601 formatında gəlir (məsələn, "2025-06-19T09:00:00.000Z")
+            const date = new Date(msg.createdAt);
+            if (!isNaN(date.getTime())) { // Tarixin düzgün parse olunduğunu yoxla
+              formattedTime = date.toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' });
+            } else {
+              console.error("Mesajın createdAt dəyəri səhv formatdadır:", msg.createdAt);
+            }
+          } catch (e) {
+            console.error("Mesajın createdAt dəyərini işləyərkən xəta baş verdi:", msg.createdAt, e);
+          }
+
+          const isMyMessage = msg.sender.id === currentUserId; // Mesajın özümüzə aid olub olmadığını yoxla
+
+          return (
+            <div key={msg.id} className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
+              <div className={`relative px-4 py-2 rounded-xl max-w-[80%] flex flex-col ${isMyMessage ? 'bg-blue-500 text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white'}`}
+                   style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                <div className="text-sm font-semibold mb-1">
+                  {msg.sender.userName}
+                </div>
+                <div className="text-base flex items-end justify-between gap-4">
+                  <span className="flex-1">{msg.message}</span>
+                  <span className="text-xs shrink-0"
+                        style={{ color: isMyMessage ? 'rgba(255,255,255,0.7)' : (theme === 'dark' ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)') }}>
+                    {formattedTime}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
+        {/* Yazma bildirisi */}
         {someoneIsTyping && (
-          <div className="text-sm text-gray-400 italic">
+          <div className="text-sm text-gray-400 dark:text-gray-500 italic px-2 py-1">
             {someoneIsTyping.username} yazır...
           </div>
         )}
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 border-t flex items-center gap-2">
+      {/* Mesaj göndərmə forması */}
+      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-200 dark:border-gray-700 flex items-center gap-2 bg-gray-50 dark:bg-gray-800">
         <input
           type="text"
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
-          onKeyUp={handleTyping} // onKeyUp doğru
+          onKeyUp={handleTyping} // Klaviaturada düymə buraxıldıqda yazma statusunu göndər
           placeholder="Mesaj yazın..."
-          className="flex-1 px-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring"
+          className="flex-1 px-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring focus:ring-blue-300 dark:focus:ring-blue-600"
+          disabled={loading && messages.length === 0} // Yükləmə zamanı inputu deaktiv et
         />
-        <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full">
+        <button
+          type="submit"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!messageInput.trim() || (loading && messages.length === 0)} // Boş mesaj və ya yükləmə zamanı düyməni deaktiv et
+        >
           Göndər
         </button>
       </form>
