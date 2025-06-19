@@ -1,19 +1,17 @@
-// components/chat/ChatWindow.tsx
 'use client';
 
-import React, { useRef, useEffect } from 'react';
-import { Spinner, Avatar, Input, Button } from '@nextui-org/react';
-import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
-
-import { ChatMessage } from '@/hooks/useChatMessages';
+import React, { useEffect, useRef, useState } from 'react';
 import { Chat } from '@/hooks/useChatList';
+import { ChatMessage } from '@/hooks/useChatMessages';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/app/store';
+import { useSocket } from '@/hooks/useSocket';
 
 interface ChatWindowProps {
   chat: Chat | null;
-  messages: ChatMessage[];
   loading: boolean;
   error: string | null;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (messageContent: string) => void;
   currentUserId: number;
   hasMoreMessages: boolean;
   onLoadMoreMessages: () => void;
@@ -21,7 +19,6 @@ interface ChatWindowProps {
 
 export const ChatWindow: React.FC<ChatWindowProps> = ({
   chat,
-  messages,
   loading,
   error,
   onSendMessage,
@@ -29,145 +26,95 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   hasMoreMessages,
   onLoadMoreMessages,
 }) => {
-  const [messageInput, setMessageInput] = React.useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatWindowRef = useRef<HTMLDivElement>(null);
+  const [messageInput, setMessageInput] = useState('');
+  const [someoneIsTyping, setSomeoneIsTyping] = useState<null | { userId: number; username: string }>(null);
+  const socketRef = useSocket();
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages.length, chat]);
+  const messages = useSelector((state: RootState) => chat?.id ? (state.messages[chat.id] || []) : []);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      if (chatWindowRef.current && chatWindowRef.current.scrollTop === 0 && hasMoreMessages && !loading) {
-        onLoadMoreMessages();
-      }
-    };
+  const handleTyping = () => {
+    if (!socketRef.current || !chat) return;
+    socketRef.current.emit('writing', { chatId: chat.id, status: true });
 
-    const currentChatWindow = chatWindowRef.current;
-    if (currentChatWindow) {
-      currentChatWindow.addEventListener('scroll', handleScroll);
-    }
-
-    return () => {
-      if (currentChatWindow) {
-        currentChatWindow.removeEventListener('scroll', handleScroll);
-      }
-    };
-  }, [hasMoreMessages, loading, onLoadMoreMessages]);
-
-  const handleSend = () => {
-    if (messageInput.trim()) {
-      onSendMessage(messageInput.trim());
-      setMessageInput('');
-    }
+    setTimeout(() => {
+      socketRef.current?.emit('writing', { chatId: chat.id, status: false });
+    }, 3000);
   };
 
-  if (!chat) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-content1 dark:bg-gray-800 rounded-lg shadow-md">
-        <h2 className="text-3xl font-semibold text-foreground dark:text-white mb-4">
-          Sohbətlərə Xoş Gəlmisiniz!
-        </h2>
-        <p className="text-lg text-default-600 dark:text-default-400 max-w-md">
-          Başlamaq üçün sol tərəfdəki çatlardan birini seçin.
-        </p>
-        <p className="mt-4 text-sm text-default-500 dark:text-default-500">
-          Mesajlarınız End-to-End şifrələnib.
-        </p>
-      </div>
-    );
-  }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!messageInput.trim()) return;
+    onSendMessage(messageInput);
+    setMessageInput('');
+  };
+
+  useEffect(() => {
+    if (!socketRef.current || !chat) return;
+
+    const handleWriting = (payload: { userId: number; username: string; status: boolean }) => {
+      if (payload.status) {
+        setSomeoneIsTyping({ userId: payload.userId, username: payload.username });
+      } else {
+        setSomeoneIsTyping(null);
+      }
+    };
+
+    socketRef.current.on('chat.writing', handleWriting);
+
+    return () => {
+      socketRef.current?.off('chat.writing', handleWriting);
+    };
+  }, [chat]);
+
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  if (!chat) return <div className="p-4">Zəhmət olmasa bir çat seçin.</div>;
 
   return (
-    <div className="flex flex-col h-full bg-content1 dark:bg-gray-800 rounded-lg shadow-lg">
-      <div className="p-4 border-b border-default-200 dark:border-gray-700 flex items-center">
-        <Avatar
-          src={
-            chat.isGroup
-              ? undefined
-              : (chat.lastMessage?.sender?.profilePicture || `https://ui-avatars.com/api/?name=${chat.name || 'Group'}&background=random`)
-          }
-          name={chat.name || (chat.isGroup ? "Qrup Çatı" : chat.lastMessage?.sender?.userName || "Naməlum")}
-          size="md"
-          className="mr-3"
-        />
-        <h2 className="text-xl font-semibold text-foreground dark:text-white">
-          {chat.name || (chat.isGroup ? "Qrup Çatı" : chat.lastMessage?.sender?.userName || "Fərdi Çat")}
-        </h2>
-      </div>
-
-      {/* flex-col-reverse və overflow-y-auto burada mesajları scroll etmək üçün istifadə olunur */}
-      <div ref={chatWindowRef} className="flex-1 p-4 overflow-y-auto flex flex-col-reverse">
-        
-        {hasMoreMessages && !loading && (
-          <Button
-            size="sm"
-            variant="flat"
-            color="primary"
-            className="self-center mt-2 mb-4"
+    <div className="flex flex-col h-full">
+      <div ref={chatContainerRef} className="flex-1 overflow-y-auto px-4 py-2 space-y-2">
+        {hasMoreMessages && (
+          <button
+            className="text-sm text-blue-500 hover:underline mb-2"
             onClick={onLoadMoreMessages}
           >
             Daha çox mesaj yüklə
-          </Button>
+          </button>
         )}
-        {loading && messages.length === 0 && (
-          <div className="flex justify-center my-4">
-            <Spinner />
-          </div>
-        )}
-        {error && (
-          <div className="text-red-500 text-center p-4">
-            <p>Mesajlar yüklənərkən xəta: {error}</p>
-          </div>
-        )}
-
-        {messages.slice().reverse().map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex mb-3 ${msg.sender.id === currentUserId ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[70%] p-3 rounded-lg shadow-md ${
-                msg.sender.id === currentUserId
-                  ? 'bg-primary-500 text-white dark:bg-green-700'
-                  : 'bg-default-200 text-foreground dark:bg-default-700 dark:text-white'
-              }`}
-            >
-              {msg.sender.id !== currentUserId && (
-                 <div className="font-semibold text-sm mb-1 text-blue-200">
-                   {msg.sender.userName}
-                 </div>
-              )}
-              <p className="text-sm break-words">{msg.message}</p>
-              <span className="block text-right text-xs mt-1 opacity-80">
-                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex ${msg.sender.id === currentUserId ? 'justify-end' : 'justify-start'}`}>
+            <div className={`px-4 py-2 rounded-xl max-w-xs ${msg.sender.id === currentUserId ? 'bg-blue-500 text-white' : 'bg-gray-200 text-black'}`}>
+              <div className="text-sm">{msg.sender.userName}</div>
+              <div>{msg.message}</div>
+              <div className="text-xs text-gray-500">{new Date(msg.createdAt).toLocaleTimeString()}</div>
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} />
+        {someoneIsTyping && (
+          <div className="text-sm text-gray-400 italic">
+            {someoneIsTyping.username} yazır...
+          </div>
+        )}
       </div>
 
-      <div className="p-4 border-t border-default-200 dark:border-gray-700 flex items-center gap-2">
-        <Input
-          placeholder="Mesaj yaz..."
+      <form onSubmit={handleSubmit} className="p-4 border-t flex items-center gap-2">
+        <input
+          type="text"
           value={messageInput}
           onChange={(e) => setMessageInput(e.target.value)}
-          onKeyPress={(e) => {
-            if (e.key === 'Enter') {
-              handleSend();
-            }
-          }}
-          className="flex-1"
-          variant="faded"
+          onKeyDown={handleTyping}
+          placeholder="Mesaj yazın..."
+          className="flex-1 px-4 py-2 rounded-full border border-gray-300 focus:outline-none focus:ring"
         />
-        <Button isIconOnly color="primary" onPress={handleSend}>
-          <PaperAirplaneIcon className="h-5 w-5 rotate-90" />
-        </Button>
-      </div>
+        <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full">
+          Göndər
+        </button>
+      </form>
     </div>
   );
 };

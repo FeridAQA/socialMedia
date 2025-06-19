@@ -1,21 +1,20 @@
 // hooks/useChatMessages.ts
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import api from '@/services/api';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../app/store';
 import { clearToken } from '../app/store/authSlice';
 import axios from 'axios';
+import { setMessages } from '../app/store/messageSlice';
 
-// Backend'den gelen Sender tipi (mesaj gönderen)
 export interface MessageSender {
   id: number;
   userName: string;
   profilePicture: string | null;
 }
 
-// Backend'den gelen Message tipi
 export interface ChatMessage {
   id: number;
   createdAt: string;
@@ -26,28 +25,25 @@ export interface ChatMessage {
 }
 
 interface UseChatMessagesOptions {
-  chatId: number | null; // Hangi chatın mesajlarını çekeceğimizi belirler
+  chatId: number | null;
   page?: number;
   limit?: number;
-  enabled?: boolean; // Bu hook-un işe düşüp düşmeyeceğini kontrol eder
+  enabled?: boolean;
 }
 
 interface UseChatMessagesResult {
-  messages: ChatMessage[];
   loading: boolean;
   error: string | null;
   refetch: () => void;
   hasMore: boolean;
-  loadMore: () => void; // Daha fazla mesaj yüklemek için
+  loadMore: () => void;
 }
 
 export const useChatMessages = (options: UseChatMessagesOptions): UseChatMessagesResult => {
   const { chatId, page = 0, limit = 10, enabled = true } = options;
-
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState<boolean>(true);
+  const [hasMore, setHasMore] = useState(true);
   const [currentPage, setCurrentPage] = useState(page);
 
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
@@ -68,24 +64,18 @@ export const useChatMessages = (options: UseChatMessagesOptions): UseChatMessage
       });
 
       const newMessages = response.data;
-      if (pageNum === 0) {
-        setMessages(newMessages); // İlk yükleme veya refetch
-      } else {
-        setMessages((prevMessages) => [...prevMessages, ...newMessages]); // Daha fazla yükle
-      }
+      dispatch(setMessages({ chatId, messages: newMessages }));
       setHasMore(newMessages.length === limit);
-
     } catch (err) {
-      console.error(`Failed to fetch messages for chat ${chatId}:`, err);
       if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.message || 'Mesajları yükləyərkən xəta baş verdi.');
+        setError(err.response?.data?.message || 'Xəta baş verdi.');
         if (err.response?.status === 401) {
           dispatch(clearToken());
         }
       } else {
-        setError('Bilinməyən xəta baş verdi.');
+        setError('Bilinməyən xəta.');
       }
-      if (pageNum === 0) setMessages([]);
+      dispatch(setMessages({ chatId, messages: [] }));
       setHasMore(false);
     } finally {
       setLoading(false);
@@ -93,10 +83,9 @@ export const useChatMessages = (options: UseChatMessagesOptions): UseChatMessage
   }, [enabled, isAuthenticated, userToken, chatId, limit, dispatch]);
 
   useEffect(() => {
-    setCurrentPage(0); // Chat ID değiştiğinde veya ilk yüklendiğinde sayfayı sıfırla
-    setMessages([]); // Mesajları sıfırla
-    setHasMore(true); // HasMore'u tekrar true yap
-    fetchMessages(0); // İlk sayfayı çek
+    setCurrentPage(0);
+    setHasMore(true);
+    fetchMessages(0);
   }, [chatId, fetchMessages]);
 
   const loadMore = useCallback(() => {
@@ -105,13 +94,17 @@ export const useChatMessages = (options: UseChatMessagesOptions): UseChatMessage
     }
   }, [loading, hasMore]);
 
-  // Sayfa numarası değiştiğinde daha fazla mesaj çek
   useEffect(() => {
     if (currentPage > 0) {
       fetchMessages(currentPage);
     }
   }, [currentPage, fetchMessages]);
 
-
-  return { messages, loading, error, refetch: () => fetchMessages(0), hasMore, loadMore };
+  return {
+    loading,
+    error,
+    refetch: () => fetchMessages(0),
+    hasMore,
+    loadMore,
+  };
 };

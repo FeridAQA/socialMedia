@@ -22,9 +22,11 @@ import { ChatWindow } from '@/components/chat/ChatWindow';
 import { useChatList, Chat } from '@/hooks/useChatList';
 import { useChatMessages, ChatMessage } from '@/hooks/useChatMessages';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useSocket } from '@/hooks/useSocket';
 
 
 export default function HomePage() {
+  useSocket();
   const router = useRouter();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const userToken = useSelector((state: RootState) => state.auth.token);
