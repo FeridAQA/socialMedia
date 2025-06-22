@@ -3,9 +3,10 @@
 
 import React from 'react';
 import { Input, Avatar, Spinner } from '@nextui-org/react';
-import { MagnifyingGlassIcon } from '@heroicons/react/24/outline'; // Outline ikon
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 
-import { Chat } from '@/hooks/useChatList';
+// Yenilənmiş Chat, ChatParticipant tiplerini import edin
+import { Chat, ChatParticipant, ProfilePicture } from '@/hooks/useChatList'; 
 
 interface ChatListProps {
   chats: Chat[];
@@ -13,7 +14,7 @@ interface ChatListProps {
   error: string | null;
   onSelectChat: (chatId: number) => void;
   selectedChatId: number | null;
-  currentUserId: number; // Cari user ID'si
+  currentUserId: number;
 }
 
 export const ChatList: React.FC<ChatListProps> = ({ chats, loading, error, onSelectChat, selectedChatId, currentUserId }) => {
@@ -43,8 +44,7 @@ export const ChatList: React.FC<ChatListProps> = ({ chats, loading, error, onSel
           variant="faded"
         />
       </div>
-      {/* Burada overflow-y-auto artıq var, bu da chat siyahısının scroll olmasını təmin edir */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {chats.length === 0 ? (
           <div className="text-center text-default-500 p-4">
             <p>Hələ heç bir çatınız yoxdur.</p>
@@ -52,8 +52,41 @@ export const ChatList: React.FC<ChatListProps> = ({ chats, loading, error, onSel
         ) : (
           chats.map((chat) => {
             const isSelected = chat.id === selectedChatId;
-            const chatDisplayName = chat.name || (chat.lastMessage?.sender?.userName || 'Naməlum İstifadəçi');
-            const chatDisplayAvatar = chat.lastMessage?.sender?.profilePicture?.url || null;
+            let chatDisplayName: string | null = chat.name;
+            let chatDisplayAvatar: string | null = null;
+
+            if (!chat.isGroup) {
+              const otherParticipant = chat.participants.find(
+                (p) => p.id !== currentUserId
+              );
+              if (otherParticipant) {
+                chatDisplayName = otherParticipant.userName;
+                // BURADA DƏYİŞİKLİK: artıq .url lazım deyil, çünki profilePicture stringdir
+                chatDisplayAvatar = otherParticipant.profilePicture || null; 
+              }
+            } else {
+              chatDisplayName = chat.name;
+              // Qruplar üçün avatarı hələki ui-avatars.com-dan alırıq
+              // Əgər qrup avatarı backenddən gəlirsə, onu da bura əlavə etmək lazımdır.
+            }
+
+            // Fallback avatar üçün məntiq
+            const finalAvatarSrc = chatDisplayAvatar || `https://ui-avatars.com/api/?name=${chatDisplayName || '?'}&background=random`;
+
+            // Last message createdAt üçün düzgün formatlaşdırma
+            let formattedTime = '';
+            if (chat.lastMessage && chat.lastMessage.createdAt) {
+                try {
+                    const date = new Date(chat.lastMessage.createdAt);
+                    if (!isNaN(date.getTime())) {
+                        formattedTime = date.toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' });
+                    } else {
+                        console.warn("Invalid date format for last message:", chat.lastMessage.createdAt);
+                    }
+                } catch (e) {
+                    console.error("Error formatting last message date:", e);
+                }
+            }
 
             return (
               <div
@@ -64,18 +97,21 @@ export const ChatList: React.FC<ChatListProps> = ({ chats, loading, error, onSel
                 onClick={() => onSelectChat(chat.id)}
               >
                 <Avatar
-                  src={chatDisplayAvatar || `https://ui-avatars.com/api/?name=${chatDisplayName}&background=random`}
+                  src={finalAvatarSrc}
+                  alt={`${chatDisplayName || 'User'}'s avatar`}
                   size="md"
                   className="mr-3"
+                  color="primary"
+                  radius="full"
                 />
                 <div className="flex-1 overflow-hidden">
                   <div className="flex justify-between items-center">
                     <h3 className="font-semibold text-lg truncate text-foreground dark:text-white">
-                      {chatDisplayName}
+                      {chatDisplayName || 'Naməlum Chat'}
                     </h3>
-                    {chat.lastMessage && (
+                    {formattedTime && (
                       <span className="text-xs text-default-500 dark:text-default-400 whitespace-nowrap">
-                        {new Date(chat.lastMessage.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formattedTime}
                       </span>
                     )}
                   </div>
