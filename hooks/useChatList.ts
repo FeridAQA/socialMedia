@@ -8,6 +8,11 @@ import { RootState, AppDispatch } from '../app/store';
 import { clearToken } from '../app/store/authSlice';
 import axios from 'axios';
 
+export interface ProfilePicture{
+  id: number;
+  url: string;
+}
+
 // Backend'den gelen LastMessage tipi
 export interface LastMessage {
   message: string;
@@ -15,7 +20,7 @@ export interface LastMessage {
   sender: {
     id: number;
     userName: string;
-    profilePicture: string | null;
+    profilePicture: ProfilePicture | null;
   };
    createdAt: string;
 }

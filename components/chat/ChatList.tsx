@@ -53,7 +53,7 @@ export const ChatList: React.FC<ChatListProps> = ({ chats, loading, error, onSel
           chats.map((chat) => {
             const isSelected = chat.id === selectedChatId;
             const chatDisplayName = chat.name || (chat.lastMessage?.sender?.userName || 'Naməlum İstifadəçi');
-            const chatDisplayAvatar = chat.lastMessage?.sender?.profilePicture || null;
+            const chatDisplayAvatar = chat.lastMessage?.sender?.profilePicture?.url || null;
 
             return (
               <div
