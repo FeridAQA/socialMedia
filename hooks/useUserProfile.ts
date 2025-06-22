@@ -8,6 +8,14 @@ import { RootState, AppDispatch } from '../app/store'; // Redux store tipləri
 import { clearToken } from '../app/store/authSlice'; // Tokeni təmizləmək üçün
 import axios from 'axios'; // Axios xətalarını yoxlamaq üçün
 
+export interface ProfilePicture {
+  id: number;
+  updatedAt: string;
+  createdAt: string;
+  filename: string;
+  url: string; // Şəkilin əsl URL-i buradadır
+}
+
 // Backend'dən gələn UserProfile tipini burada təyin edirik
 export interface UserProfile {
   id: number;
@@ -26,7 +34,7 @@ export interface UserProfile {
   activationToken: string | null;
   activationExpire: string | null;
   roles: string[];
-  profilePicture: string | null; // Avatar URL-i
+  profilePicture: ProfilePicture  | null; // Avatar URL-i
   postsCount?: number; // Frontenddə əlavə etdiyimiz üçün opsional edək (page.tsx-də hesablanır)
   isFollowing?: boolean; // Opsional edək, yalnız digər profillər üçün
 }

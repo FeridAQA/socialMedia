@@ -49,7 +49,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     <div className="flex flex-col md:flex-row items-center md:items-start gap-8 p-6 bg-content1 rounded-lg shadow-sm">
       <div className="flex-shrink-0">
         <Avatar
-          src={user.profilePicture || `https://ui-avatars.com/api/?name=${user.userName}&background=random`}
+          src={user.profilePicture?.url || `https://ui-avatars.com/api/?name=${user.userName}&background=random`}
           alt={`${user.userName}'s avatar`}
           className="w-32 h-32 text-large md:w-40 md:h-40"
           color="primary"

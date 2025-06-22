@@ -40,7 +40,7 @@ export const PostModal: React.FC<PostModalProps> = ({ isOpen, onClose, post, use
             <div className="w-full md:w-80 flex flex-col p-4 bg-content1 rounded-r-lg shadow-lg">
               <ModalHeader className="flex flex-col gap-1 border-b pb-2">
                 <div className="flex items-center gap-2">
-                  <Avatar src={user.profilePicture || `https://ui-avatars.com/api/?name=${user.userName}&background=random`} size="sm" />
+                  <Avatar src={user.profilePicture?.url || `https://ui-avatars.com/api/?name=${user.userName}&background=random`} size="sm" />
                   <span className="font-bold text-lg">{user.userName}</span>
                 </div>
               </ModalHeader>
