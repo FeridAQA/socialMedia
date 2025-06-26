@@ -2,14 +2,14 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Input } from "@nextui-org/input"; // NextUI Input
-import { Spinner, Avatar, Card, CardBody, Link as NextUILink } from '@nextui-org/react'; // NextUI komponentləri
+import { Input } from "@nextui-org/input";
+import { Spinner, Avatar, Card, CardBody, Link as NextUILink } from '@nextui-org/react';
 import { SearchIcon } from "@/components/icons";
 import { debounce } from 'lodash';
-import api from '@/services/api'; // API servisi
+import api from '@/services/api';
 import { useRouter } from 'next/navigation';
 import { useSelector } from 'react-redux';
-import { RootState } from '../store'; // Doğru yolu qeyd edin
+import { RootState } from '../store';
 
 export interface SearchUserResult {
   id: number;
@@ -23,8 +23,8 @@ export interface SearchUserResult {
     createdAt: string;
     filename: string;
     url: string;
-  } | null; // Backend cavabına uyğunlaşdırıldı
-  followStatus: string; // Backend cavabına uyğunlaşdırıldı
+  } | null;
+  followStatus: string;
 }
 
 export default function SearchPage() {
@@ -37,13 +37,12 @@ export default function SearchPage() {
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const userToken = useSelector((state: RootState) => state.auth.token);
 
-  // Axtarış API çağırışını debounse edirik
   const debouncedSearch = useCallback(
     debounce(async (term: string) => {
-      if (term.length < 2) { // 2 simvoldan qısa axtarış etmə
+      if (!isAuthenticated || !userToken) {
         setSearchResults([]);
         setSearchLoading(false);
-        setSearchError(null);
+        setSearchError("Axtarış üçün daxil olun.");
         return;
       }
 
@@ -52,9 +51,6 @@ export default function SearchPage() {
       try {
         const response = await api.get<SearchUserResult[]>(`/user/search`, {
           params: { searchParam: term },
-          // Headers `api` instance-da idarə olunursa buraya lazım deyil.
-          // Əgər API instansiyası tokeni əlavə etmirsə:
-          // headers: { 'Authorization': `Bearer ${userToken}` }
         });
         setSearchResults(response.data);
       } catch (err: any) {
@@ -64,29 +60,27 @@ export default function SearchPage() {
       } finally {
         setSearchLoading(false);
       }
-    }, 500), // 500ms gecikmə
-    []
+    }, 500),
+    [isAuthenticated, userToken]
   );
 
-  // searchTerm dəyişəndə debounced axtarışı çağır
   useEffect(() => {
-    // Yalnız autentifikasiya olunmuş user-lər axtarış edə bilsin
-    if (isAuthenticated && !!userToken) {
-      debouncedSearch(searchTerm);
-    } else {
-      setSearchResults([]);
-      setSearchLoading(false);
-      setSearchError("Axtarış üçün daxil olun.");
+    if (searchTerm.length === 0) {
+        setSearchResults([]);
+        setSearchLoading(false);
+        setSearchError(null);
+        return;
     }
+
+    debouncedSearch(searchTerm);
     
-    // Cleanup funksiyası: komponent unmount olanda debounce-ı ləğv edir
     return () => {
       debouncedSearch.cancel();
     };
-  }, [searchTerm, debouncedSearch, isAuthenticated, userToken]);
+  }, [searchTerm, debouncedSearch]);
 
   const handleUserClick = (userId: number) => {
-    router.push(`/profile/${userId}`); // İstifadəçinin profil səhifəsinə yönləndir
+    router.push(`/profile/${userId}`);
   };
 
   return (
@@ -106,7 +100,7 @@ export default function SearchPage() {
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         fullWidth
-        autoFocus // Səhifə yüklənəndə avtomatik fokuslanma
+        autoFocus
       />
 
       <div className="mt-6">
@@ -118,25 +112,28 @@ export default function SearchPage() {
           <div className="text-center text-danger-500 py-8">
             <p>{searchError}</p>
           </div>
+        ) : searchTerm.length === 0 ? (
+            <div className="text-center text-default-400 py-8">
+                <p>İstifadəçi axtarmaq üçün daxil edin.</p>
+            </div>
         ) : searchResults.length > 0 ? (
           <div className="space-y-4">
             {searchResults.map((user) => (
-              <Card 
-                key={user.id} 
-                isPressable 
-                onPress={() => handleUserClick(user.id)} 
-                className="bg-content1 hover:bg-content2 transition-colors"
+              <Card
+                key={user.id}
+                isPressable
+                onPress={() => handleUserClick(user.id)}
+                className="bg-content1 hover:bg-content2 transition-colors w-full" // BURADA DƏYİŞİKLİK
               >
-                <CardBody className="flex flex-row items-center gap-4 p-4">
-                  <Avatar 
-                    src={user.profilePicture?.url || `https://ui-avatars.com/api/?name=${user.userName}&background=random`} 
-                    size="md" 
+                <CardBody className="flex flex-row items-center gap-4 p-4 "> {/* Min-h-ni hələlik saxlayıram, çünki bu, hündürlüyün də sabit qalmasına kömək edir */}
+                  <Avatar
+                    src={user.profilePicture?.url || `https://ui-avatars.com/api/?name=${user.userName}&background=random`}
+                    size="md"
                     className="flex-shrink-0"
                   />
-                  <div className="flex flex-col flex-grow">
-                    <p className="font-semibold text-lg">{user.userName}</p>
-                    {user.firstName && <p className="text-small text-default-500">{user.firstName} {user.lastName}</p>}
-                    {/* Gizli profil indikatoru */}
+                  <div className="flex flex-col flex-grow  justify-center">
+                    <p className="font-semibold text-lg truncate">{user.userName}</p>
+                    {user.firstName && <p className="text-small text-default-500 truncate">{user.firstName} {user.lastName}</p>}
                     {user.isPrivate && (
                         <span className="text-xs text-default-400 flex items-center gap-1 mt-1">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -147,19 +144,13 @@ export default function SearchPage() {
                         </span>
                     )}
                   </div>
-                  {/* İstifadəçinin özü olub-olmadığını göstərmək üçün followStatus istifadə edə bilərsiniz, lakin axtarış nəticəsində bu lazım deyil */}
-                  {/* `followStatus` burada istifadə edilmir, çünki axtarış yalnız istifadəçiləri tapır. */}
                 </CardBody>
               </Card>
             ))}
           </div>
-        ) : searchTerm.length >= 2 ? (
+        ) : (
             <div className="text-center text-default-500 py-8">
                 <p>Heç bir nəticə tapılmadı.</p>
-            </div>
-        ) : (
-            <div className="text-center text-default-400 py-8">
-                <p>Axtarışa başlamaq üçün ən azı 2 simvol daxil edin.</p>
             </div>
         )}
       </div>
