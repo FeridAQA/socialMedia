@@ -13,6 +13,7 @@ import { Spinner, Button } from '@nextui-org/react';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store'; // Doğru yolu qeyd edin
 import { useRouter } from 'next/navigation';
+import { LockClosedIcon } from '@heroicons/react/24/outline';
 
 
 export default function OtherUserProfilePage({ params }: { params: { userId: string } }) {
@@ -130,16 +131,20 @@ export default function OtherUserProfilePage({ params }: { params: { userId: str
           <div className="text-center text-danger-500 p-4">
             {/* Şəkildəki stilə uyğun olaraq mesajı göstər */}
             {postsError === "This account is private. Follow to see their photos and videos." ? (
-                <div className="flex flex-col items-center justify-center p-8 bg-gray-800 rounded-lg text-white">
-                    <span className="text-6xl mb-4">🔒</span>
-                    <h3 className="text-2xl font-bold mb-2">This account is private</h3>
-                    <p className="text-gray-400">Follow to see their photos and videos.</p>
-                </div>
+              <div className="flex flex-col items-center justify-center p-8 rounded-lg
+                bg-gray-100 text-gray-800
+                dark:bg-gray-800 dark:text-white">
+                <LockClosedIcon className="h-16 w-16 mb-4 text-gray-500 dark:text-gray-300" /> {/* Dəyişiklik burada */}
+                <h3 className="text-2xl font-bold mb-2">This account is private</h3>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Follow to see their photos and videos.
+                </p>
+              </div>
             ) : (
-                <>
-                    <p>{postsError}</p>
-                    <Button onClick={refetchPosts} color="primary" variant="flat" className="mt-4">Yenidən cəhd et</Button>
-                </>
+              <>
+                <p>{postsError}</p>
+                <Button onClick={refetchPosts} color="primary" variant="flat" className="mt-4">Yenidən cəhd et</Button>
+              </>
             )}
           </div>
         ) : posts.length === 0 ? (
