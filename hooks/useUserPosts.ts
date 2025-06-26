@@ -1,38 +1,38 @@
-// hooks/useUserPosts.ts
+// src/hooks/useUserPosts.ts
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
 import api from '@/services/api'; // Axios instansiyasını import edin
-import { useDispatch, useSelector } from 'react-redux'; // Reduxdan
-import { RootState, AppDispatch } from '../app/store'; // Redux store tipləri
-import { clearToken } from '../app/store/authSlice'; // Tokeni təmizləmək üçün
-import axios from 'axios'; // Axios xətalarını yoxlamaq üçün
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState, AppDispatch } from '../app/store'; // Doğru yolu qeyd edin (məsələn, 'src/app/store')
+import { clearToken } from '../app/store/authSlice';
+import axios from 'axios';
 
-// Backend'dən gələn Image obyekti üçün interfeys
 export interface PostImage {
   id: number;
   updatedAt: string;
   createdAt: string;
   filename: string;
-  url: string; // Şəklin URL-i
+  url: string;
 }
 
-// Backend'dən gələn UserPost tipini dəqiqləşdiririk
 export interface UserPost {
   id: number;
   updatedAt: string;
   createdAt: string;
-  description: string; // API-dan `description` olaraq gəlir, `caption` yerinə
-  likes: any[]; // API-dan `likes` array-i olaraq gəlir (içindəkilər dəqiqləşdirilə bilər)
-  images: PostImage[]; // `images` array-i, hər birində URL var
-  // comments?: any[]; // Əgər post cavabında comments array-i gəlirsə, bura əlavə edin
+  description: string;
+  likes: any[];
+  images: PostImage[];
 }
 
-// --- useUserPosts Hooku ---
 interface UseUserPostsOptions {
+  userId: string; // userId burada mütləqdir
   page?: number;
   limit?: number;
-  enabled?: boolean; // Bu hook-un işə düşüb-düşməyəcəyini idarə etmək üçün
+  enabled?: boolean;
+  // Gizli profil məntiqi üçün əlavə parametrlər
+  isPrivate?: boolean;
+  followStatus?: 'following' | 'not-following' | 'waiting' | 'self';
 }
 
 interface UseUserPostsResult {
@@ -40,11 +40,11 @@ interface UseUserPostsResult {
   loading: boolean;
   error: string | null;
   refetch: () => void;
-  hasMore: boolean; // Daha çox post olub-olmadığını göstərir
+  hasMore: boolean;
 }
 
-export const useUserPosts = (options?: UseUserPostsOptions): UseUserPostsResult => {
-  const { page = 0, limit = 10, enabled = true } = options || {};
+export const useUserPosts = (options: UseUserPostsOptions): UseUserPostsResult => {
+  const { userId, page = 0, limit = 10, enabled = true, isPrivate, followStatus } = options;
 
   const [posts, setPosts] = useState<UserPost[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -52,30 +52,58 @@ export const useUserPosts = (options?: UseUserPostsOptions): UseUserPostsResult 
   const [hasMore, setHasMore] = useState<boolean>(true);
 
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
-  const userToken = useSelector((state: RootState) => state.auth.token); // Tokeni də yoxlayırıq
+  const userToken = useSelector((state: RootState) => state.auth.token);
   const dispatch = useDispatch<AppDispatch>();
 
-  const fetchPosts = useCallback(async () => {
-    if (!enabled || !isAuthenticated || !userToken) {
+  const fetchUserPosts = useCallback(async () => {
+    // İlkin yoxlamalar
+    if (!enabled || !isAuthenticated || !userToken || !userId) {
+      setLoading(false);
+      return;
+    }
+
+    // GİZLİ PROFİL MƏNTİQİ: Əgər profil gizlidirsə və istifadəçi izləmirsə
+    if (isPrivate && followStatus !== 'following' && followStatus !== 'self') {
+      setLoading(false);
+      setPosts([]); // Postları təmizlə
+      setError("This account is private. Follow to see their photos and videos.");
+      setHasMore(false); // Daha çox post yoxdur
+      return;
+    }
+
+    if (page > 0 && !hasMore) { // Daha çox post yoxdursa və ilk səhifə deyilsə yükləmə
       setLoading(false);
       return;
     }
 
     setLoading(true);
     setError(null);
+
     try {
-      const response = await api.get<UserPost[]>(`/post/user`, {
+      // Axios ilə API çağırışı
+      const response = await api.get<UserPost[]>(`/post/user/${userId}`, {
         params: { page, limit },
+        // Headers API instansiyasında təyin oluna bilər, amma əmin olmaq üçün burda da ola bilər.
+        // API instansiyanız tokeni avtomatik əlavə edirsə, bu lazım deyil:
+        // headers: { 'Authorization': `Bearer ${userToken}` }
       });
 
       const newPosts = response.data;
-      setPosts(newPosts);
+      
+      // Infinite scroll üçün əvvəlki postları qoruyun
+      setPosts((prevPosts) => (page === 0 ? newPosts : [...prevPosts, ...newPosts]));
       setHasMore(newPosts.length === limit);
 
-    } catch (err) {
+    } catch (err: any) { // 'any' yerinə 'AxiosError' istifadə etmək daha yaxşıdır
       console.error('Failed to fetch user posts:', err);
       if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.message || 'Postları yükləyərkən xəta baş verdi.');
+        // GİZLİ PROFİL MƏNTİQİ: Backend 403 Forbidden qaytarırsa xüsusi mesajı göstər
+        if (err.response?.status === 403) {
+            setError("This account is private. Follow to see their photos and videos.");
+        } else {
+            setError(err.response?.data?.message || 'Postları yükləyərkən xəta baş verdi.');
+        }
+        
         if (err.response?.status === 401) {
           dispatch(clearToken());
         }
@@ -87,11 +115,19 @@ export const useUserPosts = (options?: UseUserPostsOptions): UseUserPostsResult 
     } finally {
       setLoading(false);
     }
-  }, [page, limit, enabled, isAuthenticated, userToken, dispatch]);
+  }, [userId, page, limit, enabled, isAuthenticated, userToken, isPrivate, followStatus, hasMore, dispatch]);
 
   useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
+    fetchUserPosts();
+  }, [fetchUserPosts]);
 
-  return { posts, loading, error, refetch: fetchPosts, hasMore };
+  useEffect(() => {
+    // userId, isPrivate, followStatus dəyişəndə state-i sıfırla
+    setPosts([]);
+    setHasMore(true);
+    setLoading(true);
+    setError(null);
+  }, [userId, isPrivate, followStatus]); // Yeni asılılıqlar əlavə edildi
+
+  return { posts, loading, error, refetch: fetchUserPosts, hasMore };
 };

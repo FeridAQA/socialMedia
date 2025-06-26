@@ -1,47 +1,47 @@
-// hooks/useUserProfile.ts
+// src/hooks/useUserProfile.ts
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import api from '@/services/api'; // Axios instansiyasını import edin
-import { useDispatch, useSelector } from 'react-redux'; // Reduxdan
-import { RootState, AppDispatch } from '../app/store'; // Redux store tipləri
-import { clearToken } from '../app/store/authSlice'; // Tokeni təmizləmək üçün
-import axios from 'axios'; // Axios xətalarını yoxlamaq üçün
+import api from '@/services/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState, AppDispatch } from '../app/store'; // Doğru yolu qeyd edin
+import { clearToken } from '../app/store/authSlice';
+import axios from 'axios';
 
 export interface ProfilePicture {
   id: number;
   updatedAt: string;
   createdAt: string;
   filename: string;
-  url: string; // Şəkilin əsl URL-i buradadır
+  url: string;
 }
 
-// Backend'dən gələn UserProfile tipini burada təyin edirik
 export interface UserProfile {
   id: number;
-  updatedAt: string;
-  createdAt: string;
+  updatedAt?: string;
+  createdAt?: string;
   firstName: string | null;
   lastName: string | null;
   userName: string;
-  email: string;
+  email?: string;
   bio: string | null;
   followerCount: number;
   followedCount: number;
   isPrivate: boolean;
   birthDate: string;
-  gender: string;
-  activationToken: string | null;
-  activationExpire: string | null;
-  roles: string[];
-  profilePicture: ProfilePicture  | null; // Avatar URL-i
-  postsCount?: number; // Frontenddə əlavə etdiyimiz üçün opsional edək (page.tsx-də hesablanır)
-  isFollowing?: boolean; // Opsional edək, yalnız digər profillər üçün
+  gender?: string;
+  activationToken?: string | null;
+  activationExpire?: string | null;
+  roles?: string[];
+  profilePicture: ProfilePicture  | null;
+  postsCount?: number;
+  // followStatus tipini dəqiqləşdiririk ki, 'self' də ola bilsin
+  followStatus?: 'following' | 'not-following' | 'waiting' | 'self';
 }
 
-// --- useUserProfile Hooku ---
 interface UseUserProfileOptions {
-  enabled?: boolean; // Bu hook-un işə düşüb-düşməyəcəyini idarə etmək üçün
+  userId?: string;
+  enabled?: boolean;
 }
 
 interface UseUserProfileResult {
@@ -52,7 +52,7 @@ interface UseUserProfileResult {
 }
 
 export const useUserProfile = (options?: UseUserProfileOptions): UseUserProfileResult => {
-  const { enabled = true } = options || {};
+  const { userId, enabled = true } = options || {};
 
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -60,10 +60,11 @@ export const useUserProfile = (options?: UseUserProfileOptions): UseUserProfileR
 
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const userToken = useSelector((state: RootState) => state.auth.token);
+  const currentAuthUser = useSelector((state: RootState) => state.auth.user);
   const dispatch = useDispatch<AppDispatch>();
 
   const fetchUserProfile = useCallback(async () => {
-    if (!enabled || !isAuthenticated || !userToken) {
+    if (!enabled || !isAuthenticated || !userToken || (userId && userId === '')) {
       setLoading(false);
       return;
     }
@@ -71,9 +72,28 @@ export const useUserProfile = (options?: UseUserProfileOptions): UseUserProfileR
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get<UserProfile>('/user/profile'); // Backend endpointinizə uyğun dəyişin
-      setUser(response.data);
-    } catch (err) {
+      let url: string;
+      if (userId) {
+        url = `/user/profile/${userId}`;
+      } else {
+        url = `/user/profile`;
+      }
+      
+      const response = await api.get<UserProfile>(url);
+      
+      let fetchedUser = response.data;
+
+      // ÖZ PROFİLİ üçn followStatus-u 'self' olaraq təyin etmə
+      if (currentAuthUser && fetchedUser.id === currentAuthUser.id) {
+        // Backend 'self' qaytarmırsa və bu öz profilimizdirsə, 'self' təyin edirik.
+        // Əgər backend 'following' qaytarırsa, bu istifadəçinin özünü izləməsi kimi anlaşılır.
+        // Bu hissə backend-in necə qurulmasından asılıdır. Ən dəqiq variant 'self' olmalıdır.
+        fetchedUser.followStatus = 'self'; 
+      }
+
+      setUser(fetchedUser);
+
+    } catch (err: any) { // AxiosError tipini yoxlamaq daha məqsədəuyğundur
       console.error('Failed to fetch user profile:', err);
       if (axios.isAxiosError(err)) {
         setError(err.response?.data?.message || 'Profil məlumatlarını yükləyərkən xəta baş verdi.');
@@ -87,11 +107,17 @@ export const useUserProfile = (options?: UseUserProfileOptions): UseUserProfileR
     } finally {
       setLoading(false);
     }
-  }, [enabled, isAuthenticated, userToken, dispatch]);
+  }, [enabled, isAuthenticated, userToken, userId, currentAuthUser, dispatch]);
 
   useEffect(() => {
     fetchUserProfile();
   }, [fetchUserProfile]);
+
+  useEffect(() => {
+    setUser(null);
+    setLoading(true);
+    setError(null);
+  }, [userId]);
 
   return { user, loading, error, refetch: fetchUserProfile };
 };

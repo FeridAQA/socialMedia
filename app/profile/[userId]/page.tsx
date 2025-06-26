@@ -1,4 +1,4 @@
-// app/profile/page.tsx
+// app/profile/[userId]/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -10,37 +10,38 @@ import { useUserProfile, UserProfile } from '@/hooks/useUserProfile';
 import { useUserPosts, UserPost } from '@/hooks/useUserPosts';
 
 import { Spinner, Button } from '@nextui-org/react';
-import { useSelector, useDispatch } from 'react-redux';
-import { RootState, AppDispatch } from '../store'; // Doğru yolu qeyd edin
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store'; // Doğru yolu qeyd edin
 import { useRouter } from 'next/navigation';
-import { clearToken } from '../store/authSlice';
 
 
-export default function ProfilePage() {
+export default function OtherUserProfilePage({ params }: { params: { userId: string } }) {
   const router = useRouter();
-  const dispatch = useDispatch<AppDispatch>();
   const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
   const userToken = useSelector((state: RootState) => state.auth.token);
-  const currentUser = useSelector((state: RootState) => state.auth.user); // Cari autentifikasiya olunmuş istifadəçi məlumatı
+  const currentUser = useSelector((state: RootState) => state.auth.user);
+
+  const profileUserId = params.userId;
 
   const [selectedPost, setSelectedPost] = useState<UserPost | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
 
-  // useUserProfile hook-u cari istifadəçinin profilini çəkir (userId ötürülmür)
+  // useUserProfile hook-u URL-dəki `profileUserId`-dən istifadə etsin
   const { user, loading: userLoading, error: userError, refetch: refetchUser } = useUserProfile({
-    enabled: isAuthenticated && !!userToken
+    userId: profileUserId,
+    enabled: isAuthenticated && !!userToken && !!profileUserId
   });
 
-  // useUserPosts hook-u üçün currentUser?.id istifadə olunur
-  // ÇOX VACİB: currentUser?.id-nin string olduğuna əmin olun, əgər numberdirsə .toString() istifadə edin
+  // useUserPosts hook-unu da URL-dəki `profileUserId`-dən istifadə etsin
+  // GİZLİ PROFİL MƏNTİQİ ÜÇÜN isPrivate və followStatus ötürülür
   const { posts, loading: postsLoading, error: postsError, refetch: refetchPosts, hasMore } = useUserPosts({
-    userId: currentUser?.id?.toString() || '', // BURADA DÜZƏLİŞ: currentUser.id-ni ötürürük
+    userId: profileUserId,
     page: currentPage,
     limit: 10,
-    enabled: isAuthenticated && !!userToken && !!currentUser?.id, // Yalnız ID varsa enabled olsun
-    isPrivate: user?.isPrivate, // Cari userin profil məlumatı ilə isPrivate ötürülür
-    followStatus: user?.followStatus // Cari userin profil məlumatı ilə followStatus ötürülür
+    enabled: isAuthenticated && !!userToken && !!profileUserId,
+    isPrivate: user?.isPrivate, // BURADA user obyektindən isPrivate ötürülür
+    followStatus: user?.followStatus // BURADA user obyektindən followStatus ötürülür
   });
 
   useEffect(() => {
@@ -49,12 +50,12 @@ export default function ProfilePage() {
     }
   }, [isAuthenticated, userToken, userLoading, postsLoading, router]);
 
-  // Səhifə dəyişəndə postları yeniləmək
+  // `profileUserId` dəyişdikdə post səhifəsini sıfırla və postları sıfırla
   useEffect(() => {
-    if (isAuthenticated && !!userToken && !!currentUser?.id) {
-      refetchPosts(); // currentUser.id dəyişəndə postları yenidən çək
-    }
-  }, [currentPage, isAuthenticated, userToken, currentUser?.id, refetchPosts]);
+    setCurrentPage(0);
+    // useUserPosts hook-u özü userId, isPrivate, followStatus dəyişəndə daxili post state-ini sıfırlayır.
+    // Lakin, əmin olmaq üçün refetchPosts() da çağırıla bilər.
+  }, [profileUserId]);
 
 
   const handlePostClick = (post: UserPost) => {
@@ -68,24 +69,25 @@ export default function ProfilePage() {
   };
 
   const handleLoadMore = () => {
-    if (hasMore && !postsLoading && !postsError) {
+    if (hasMore && !postsLoading && !postsError) { // Xəta yoxdursa və daha çox varsa yüklə
       setCurrentPage((prevPage) => prevPage + 1);
     }
   };
 
   const handleFollowToggle = () => {
-    console.log("Follow/Unfollow action. (Self profile, should not be callable)");
-    // Bu funksiya öz profilinizdə çağrılmamalıdır.
-    // Əgər ProfileHeader-də 'follow' düyməsi isCurrentUser true olanda gizlidirsə, bu hissəyə düşməyəcək.
+    console.log("Follow/Unfollow action for user:", user?.id);
+    // Buraya API çağırışı gələcək (izləmə/izləmədən çıxma)
+    // Məsələn: dispatch(followUser(user.id));
+    // Sonra refetchUser() ilə profili yeniləyin ki, `followStatus` dəyişikliyi görünsün.
+    // Həmçinin, refetchPosts() da çağırıla bilər ki, postlar yenidən yüklənsin (əgər gizlidirsə açılsa).
   };
 
   const handleEditProfile = () => {
     console.log("Edit Profile action.");
-    // Redaktə səhifəsinə yönləndirmə
-    // router.push('/settings/profile');
+    // Digər istifadəçinin profilində redaktə düyməsi olmaz
   };
 
-  if (userLoading) {
+  if (userLoading) { // postsLoading-i buradan çıxardım, çünki useUserPosts öz daxilində gizli profil üçün loading-i tez bitirə bilər.
     return (
       <div className="flex justify-center items-center h-screen">
         <Spinner size="lg" />
@@ -105,11 +107,10 @@ export default function ProfilePage() {
 
   const userWithPostsCount = {
     ...user,
-    postsCount: posts.length, // Çəkilən postların sayını əlavə edirik
+    postsCount: posts.length, // Çəkilən postların sayını əlavə edirik (bu `posts` artıq düzgün gələn postlardır)
   };
 
-  // Öz profilimizdə isCurrentUser həmişə true olacaq
-  const isCurrentUser = true;
+  const isCurrentUser = !!currentUser && user.id === currentUser.id;
 
   return (
     <div className="container mx-auto p-4 max-w-5xl">
@@ -120,14 +121,15 @@ export default function ProfilePage() {
         onEditProfile={handleEditProfile}
       />
       <div className="mt-8">
-        {postsLoading && posts.length === 0 && !postsError ? (
+        {postsLoading && posts.length === 0 && !postsError ? ( // postsError yoxdursa loading spinner göstər
           <div className="flex justify-center items-center h-48">
             <Spinner />
             <p className="ml-2 text-default-500">Postlar yüklənir...</p>
           </div>
         ) : postsError ? (
           <div className="text-center text-danger-500 p-4">
-             {postsError === "This account is private. Follow to see their photos and videos." ? (
+            {/* Şəkildəki stilə uyğun olaraq mesajı göstər */}
+            {postsError === "This account is private. Follow to see their photos and videos." ? (
                 <div className="flex flex-col items-center justify-center p-8 bg-gray-800 rounded-lg text-white">
                     <span className="text-6xl mb-4">🔒</span>
                     <h3 className="text-2xl font-bold mb-2">This account is private</h3>
@@ -143,9 +145,7 @@ export default function ProfilePage() {
         ) : posts.length === 0 ? (
           <div className="text-center text-default-500 p-4">
             <p>Hələ heç bir post yoxdur.</p>
-            {isCurrentUser && !postsLoading && ( // Yalnız öz profilimizdə post paylaş düyməsini göstər
-              <Button onClick={() => router.push('/upload')} color="primary" variant="flat" className="mt-4">İlk postunu paylaş</Button>
-            )}
+            {/* Digər istifadəçinin profilində post paylaş düyməsi olmaz */}
           </div>
         ) : (
           <>
