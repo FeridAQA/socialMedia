@@ -50,7 +50,7 @@ export const Navbar = () => {
 
   return (
     <>
-      <SafetyWarning />
+      {/* <SafetyWarning /> */}
 
       <HeroUINavbar maxWidth="xl" position="sticky">
         <NavbarContent className="basis-1/5 lg:basis-full" justify="start">
