@@ -1,23 +1,20 @@
-// components/navbar.tsx
 'use client';
 
 import React from "react";
 import {
-  Navbar as HeroUINavbar, // HeroUI Navbar
+  Navbar as HeroUINavbar,
   NavbarContent,
   NavbarMenu,
   NavbarMenuToggle,
   NavbarBrand,
   NavbarItem,
   NavbarMenuItem,
-} from "@nextui-org/navbar"; // @heroui/navbar-dan @nextui-org/navbar-a dəyişdirildi.
-// NOTE: Sizin `heroui` paketləriniz NextUI kimi görünür. Əgər `heroui` əslində NextUI-dırsa, importları `nextui-org/react` və ya `nextui-org/navbar` kimi düzəldin.
-// Hazırki kodunuzda `nextui-org/navbar` kimi dəyişdim, çünki bu tipik NextUI istifadəsinə uyğundur.
-import { Button } from "@nextui-org/button"; // @heroui/button-dan @nextui-org/button-a dəyişdirildi
-import { Kbd } from "@nextui-org/react"; // @heroui/kbd-dan @nextui-org/react-a dəyişdirildi (Kbd adətən NextUI-dən gəlir)
-import { Link } from "@nextui-org/link"; // @heroui/link-dan @nextui-org/link-ə dəyişdirildi
-import { Input } from "@nextui-org/input"; // @heroui/input-dan @nextui-org/input-a dəyişdirildi
-import { link as linkStyles } from "@nextui-org/theme"; // @heroui/theme-dən @nextui-org/theme-ə dəyişdirildi
+} from "@nextui-org/navbar";
+import { Button } from "@nextui-org/button"; // Button komponenti əlavə edildi
+import { Kbd } from "@nextui-org/react";
+import { Link } from "@nextui-org/link";
+import { Input } from "@nextui-org/input";
+import { link as linkStyles } from "@nextui-org/theme";
 import NextLink from "next/link";
 import clsx from "clsx";
 
@@ -27,16 +24,13 @@ import {
   LinkedInIcon,
   GithubIcon,
   Logo,
-  SearchIcon, // SearchIcon importunu geri qaytarın
+  SearchIcon,
 } from "@/components/icons";
 
 import { useSelector, useDispatch } from 'react-redux';
-import { RootState } from '../app/store'; // Yolunuzu dəqiqləşdirin
+import { RootState } from '../app/store';
 import { clearToken } from '../app/store/authSlice';
 import { useRouter } from 'next/navigation';
-
-// import { SearchComponent } from '@/components/search/SearchComponent'; // Bunu silirik
-import { SafetyWarning } from "./common/SafetyWarning";
 
 export const Navbar = () => {
   const router = useRouter();
@@ -50,8 +44,6 @@ export const Navbar = () => {
 
   return (
     <>
-      {/* <SafetyWarning /> */}
-
       <HeroUINavbar maxWidth="xl" position="sticky">
         <NavbarContent className="basis-1/5 lg:basis-full" justify="start">
           <NavbarBrand as="li" className="gap-3 max-w-fit">
@@ -92,16 +84,20 @@ export const Navbar = () => {
           className="hidden lg:flex basis-1/5 lg:basis-full"
           justify="end"
         >
-          {/* Search Icon-u buraya əlavə edirik */}
+          {/* Search Icon-u (Desktop) - Button ilə */}
           <NavbarItem className="flex">
-            <NextLink href="/search" passHref> {/* /search səhifəsinə yönləndirir */}
-              <Link color="foreground" aria-label="Axtarış"> {/* Link komponentini istifadə edirik */}
-                <SearchIcon className="text-default-500" />
-              </Link>
-            </NextLink>
+            <Button
+              isIconOnly
+              aria-label="Axtarış"
+              variant="light" // Yalnız ikon olduğundan, arxa planı şəffaf olsun
+              onClick={() => router.push('/search')}
+            >
+              <SearchIcon className="text-default-500" />
+            </Button>
           </NavbarItem>
 
           <NavbarItem className="flex gap-2">
+            {/* LinkedIn ikonu - Desktop */}
             <Link isExternal aria-label="LinkedIn" href={siteConfig.links.linkedin}>
               <LinkedInIcon className="text-default-500" />
             </Link>
@@ -134,12 +130,19 @@ export const Navbar = () => {
 
         {/* Mobile Menu Toggle and Social Icons (visible on screens smaller than 1024px) */}
         <NavbarContent className="lg:hidden basis-1 pl-4" justify="end">
-          {/* Mobil menyuda da SearchIcon */}
-          <NextLink href="/search" passHref>
-              <Link color="foreground" aria-label="Axtarış">
-                <SearchIcon className="text-default-500" />
-              </Link>
-            </NextLink>
+          {/* **DƏYİŞİKLİK BURADA:** Mobil görünüşdə SearchIcon - Button ilə */}
+          <Button
+            isIconOnly
+            aria-label="Axtarış"
+            variant="light"
+            onClick={() => router.push('/search')}
+          >
+            <SearchIcon className="text-default-500" />
+          </Button>
+          {/* Mobil görünüşdə LinkedIn ikonu */}
+          {/* <Link isExternal aria-label="LinkedIn" href={siteConfig.links.linkedin}>
+            <LinkedInIcon className="text-default-500" />
+          </Link> */}
           <Link isExternal aria-label="Github" href={siteConfig.links.github}>
             <GithubIcon className="text-default-500" />
           </Link>
@@ -149,10 +152,6 @@ export const Navbar = () => {
 
         {/* Mobile Menu (açılanda görünür) */}
         <NavbarMenu>
-          {/* Mobil menyudakı searchInput-u silirik, çünki artıq ayrıca səhifəyə yönləndirəcəyik */}
-          {/* <div className="mx-4 mt-2">
-            <SearchComponent />
-          </div> */}
           <div className="mx-4 mt-2 flex flex-col gap-2">
             <NavbarMenuItem>
               <Link
@@ -170,6 +169,18 @@ export const Navbar = () => {
                 size="lg"
               >
                 Profil
+              </Link>
+            </NavbarMenuItem>
+            {/* Mobil menyuda LinkedIn linki */}
+            <NavbarMenuItem>
+              <Link
+                isExternal
+                aria-label="LinkedIn"
+                href={siteConfig.links.linkedin}
+                size="lg"
+                color="foreground"
+              >
+                LinkedIn
               </Link>
             </NavbarMenuItem>
             <NavbarMenuItem>
