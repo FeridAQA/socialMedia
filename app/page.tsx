@@ -1,4 +1,3 @@
-// app/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -12,7 +11,7 @@ import config from '@/config';
 // Ortak komponentler
 import { SafetyWarning } from '@/components/common/SafetyWarning';
 import { WelcomeMessage } from '@/components/common/WelcomeMessage';
-import { Footer } from '@/components/Footer'; // Footer-i import etdik
+import { Footer } from '@/components/Footer';
 
 // Chat komponentleri
 import { ChatList } from '@/components/chat/ChatList';
@@ -37,6 +36,8 @@ export default function HomePage() {
   const [sendMessageLoading, setSendMessageLoading] = useState<boolean>(false);
   const [sendMessageError, setSendMessageError] = useState<string | null>(null);
 
+  const [showChatWindow, setShowChatWindow] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   const { user: currentUserProfile, loading: userProfileLoading, error: userProfileError } = useUserProfile({
     enabled: isAuthenticated && !!userToken
@@ -62,25 +63,41 @@ export default function HomePage() {
     limit: 20,
   });
 
-
   useEffect(() => {
-    if (!selectedChatId && chats.length > 0) {
-      setSelectedChatId(chats[0].id);
+    if (isAuthenticated && chats.length > 0) {
+        if (isInitialLoad || window.innerWidth >= 768) {
+            if (!selectedChatId) {
+                setSelectedChatId(chats[0].id);
+                if (window.innerWidth >= 768) {
+                    setShowChatWindow(true);
+                }
+            }
+        }
     }
-  }, [chats, selectedChatId]);
+    setIsInitialLoad(false); 
+  }, [chats, selectedChatId, isAuthenticated, isInitialLoad]);
 
   useEffect(() => {
     if (selectedChatId) {
       const foundChat = chats.find(chat => chat.id === selectedChatId);
       setSelectedChat(foundChat || null);
+      setShowChatWindow(true); 
     } else {
       setSelectedChat(null);
+      setShowChatWindow(false);
     }
   }, [selectedChatId, chats]);
 
 
   const handleSelectChat = (chatId: number) => {
     setSelectedChatId(chatId);
+    setShowChatWindow(true);
+  };
+
+  const handleBackToChatList = () => {
+    setShowChatWindow(false);
+    setSelectedChatId(null);
+    setSelectedChat(null);
   };
 
   const handleSendMessage = async (messageContent: string) => {
@@ -107,10 +124,10 @@ export default function HomePage() {
       const requestPayload = { chatId: selectedChatId, messsage: messageContent };
 
       console.log('Mesaj göndərilir (page.tsx):');
-      console.log('  URL:', requestUrl);
-      console.log('  Method:', 'POST');
-      console.log('  Payload:', requestPayload);
-      console.log('  Authorization Token (ilk 10 simvol):', userToken ? userToken.substring(0, 10) + '...' : 'Yoxdur');
+      console.log('   URL:', requestUrl);
+      console.log('   Method:', 'POST');
+      console.log('   Payload:', requestPayload);
+      console.log('   Authorization Token (ilk 10 simvol):', userToken ? userToken.substring(0, 10) + '...' : 'Yoxdur');
 
       const response = await axios.post(requestUrl, requestPayload, {
         headers: {
@@ -140,26 +157,20 @@ export default function HomePage() {
   };
 
   return (
-    // Əsas konteyner ekranın tam hündürlüyünü tutmalı və dikey olaraq flex olmalıdır.
-    // "overflow-hidden" əsas səhifədə scrollbarın yaranmasının qarşısını alır.
+    // **DƏYİŞİKLİK BURADA:** `overflow-hidden` əlavə edildi
+    // Bu, səhifənin özünün scrollbarının olmasının qarşısını alır
     <div className="flex flex-col h-screen overflow-hidden"> 
-      {/* Navigasiya paneli (sizin My Social Media, Ana Səhifə hissəniz) */}
-      {/* h-16 (64px) hündürlük veririk və flex-shrink-0 ilə onun ölçüsünün sabit qalmasını təmin edirik */}
-     
-
-      {/* Təhlükəsizlik xəbərdarlığı komponenti */}
-      {/* `flex-shrink-0` ilə sabit ölçüdə qalmasını təmin edirik */}
-      {/* SafetyWarning komponentinin özündə də h-16 kimi sabit hündürlük və kiçik paddinglər olmalıdır. */}
+      {/* SafetyWarning komponenti əgər hələ də yoxdursa, onu əlavə edin */}
+      {/* Bu komponentin özü də sabit hündürlükdə olmalı və flex-shrink-0 olmalıdır */}
+      {/* <SafetyWarning />  */}
 
       {/* Əsas kontent sahəsi (ChatList və ChatWindow) */}
-      {/* `flex-1` ona yerdə qalan bütün boşluğu tutmağı bildirir. */}
-      {/* Bu divin özü də `overflow-hidden` olmalıdır ki, daxili scrollbarlar düzgün işləsin. */}
+      {/* Bu div hündürlüyün qalan hissəsini tutur və daxili scroll-u idarə edir */}
       <div className="flex flex-1 overflow-hidden"> 
         {isAuthenticated ? (
           <>
             {/* ChatList üçün */}
-            {/* `h-full` valideynin hündürlüyünü tam tutur, `overflow-y-auto` daxili scrollbar verir. */}
-            <div className="w-full md:w-1/3 lg:w-1/4 xl:w-1/5 min-w-[280px] border-r border-default-200 dark:border-gray-700 flex-shrink-0 flex flex-col h-full overflow-y-auto">
+            <div className={`w-full md:w-1/3 lg:w-1/4 xl:w-1/5 min-w-[280px] border-r border-default-200 dark:border-gray-700 flex-shrink-0 flex flex-col h-full overflow-y-auto ${showChatWindow ? 'hidden md:flex' : 'flex'}`}>
               <ChatList
                 chats={chats}
                 loading={chatListLoading}
@@ -171,17 +182,16 @@ export default function HomePage() {
             </div>
 
             {/* ChatWindow üçün */}
-            {/* `flex-1` qalan eni tutur, `h-full` valideynin hündürlüyünü, `overflow-y-auto` daxili scrollbar verir. */}
-            <div className="flex-1 flex flex-col h-full bg-content2 dark:bg-gray-900 overflow-y-auto">
+            <div className={`flex-1 flex flex-col h-full bg-content2 dark:bg-gray-900 overflow-y-auto ${selectedChatId === null || (showChatWindow === false && window.innerWidth < 768) ? 'hidden' : 'flex'}`}>
               <ChatWindow
                 chat={selectedChat}
                 messages={messages}
                 loading={messagesLoading || sendMessageLoading}
                 error={messagesError || sendMessageError}
                 onSendMessage={handleSendMessage}
-                currentUserId={currentUserId || 0}
                 hasMoreMessages={hasMoreMessages}
                 onLoadMoreMessages={loadMoreMessages}
+                onBackToChatList={handleBackToChatList}
               />
             </div>
           </>
@@ -193,7 +203,8 @@ export default function HomePage() {
       </div>
 
       {/* Footer komponenti */}
-      {/* h-12 (48px) hündürlük veririk və flex-shrink-0 ilə onun ölçüsünün sabit qalmasını təmin edirik */}
-      </div>
+      {/* Footer-in özü də sabit hündürlükdə olmalı və flex-shrink-0 olmalıdır ki, əsas kontent sahəsinin ölçüsünü dəyişməsin */}
+      <Footer />
+    </div>
   );
 }
